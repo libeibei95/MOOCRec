@@ -1,2 +1,2 @@
 # EduRec_Pytorch
-Disentangled Self-Supervision for Recommending Course Topics
+Disentangled Self-Supervision for Recommending Videos in MOOCs
