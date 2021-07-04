@@ -8,25 +8,6 @@ import copy
 import math
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-
-
-def gelu(x):
-    """Implementation of the gelu activation function.
-        For information: OpenAI GPT's gelu is slightly different
-        (and gives slightly different results):
-        0.5 * x * (1 + torch.tanh(math.sqrt(2 / math.pi) *
-        (x + 0.044715 * torch.pow(x, 3))))
-        Also see https://arxiv.org/abs/1606.08415
-    """
-    return x * 0.5 * (1.0 + torch.erf(x / math.sqrt(2.0)))
-
-
-def swish(x):
-    return x * torch.sigmoid(x)
-
-
-ACT2FN = {"gelu": gelu, "relu": F.relu, "swish": swish}
 
 
 class LayerNorm(nn.Module):
@@ -138,22 +119,19 @@ class SelfAttention(nn.Module):
 class PointWiseFeedForward(nn.Module):
     def __init__(self, args):
         super(PointWiseFeedForward, self).__init__()
-        self.dense_1 = nn.Linear(args.hidden_size, args.hidden_size * 4)
-        if isinstance(args.hidden_act, str):
-            self.intermediate_act_fn = ACT2FN[args.hidden_act]
-        else:
-            self.intermediate_act_fn = args.hidden_act
-
-        self.dense_2 = nn.Linear(args.hidden_size * 4, args.hidden_size)
+        self.conv1d_1 = nn.Conv1d(args.hidden_size, args.hidden_size, kernel_size=(1,))
+        self.activation = nn.ReLU()
+        self.conv1d_2 = nn.Conv1d(args.hidden_size, args.hidden_size, kernel_size=(1,))
         self.LayerNorm = LayerNorm(args.hidden_size, eps=1e-12)
         self.dropout = nn.Dropout(args.hidden_dropout_prob)
 
     def forward(self, input_tensor):
 
-        hidden_states = self.dense_1(input_tensor)
-        hidden_states = self.intermediate_act_fn(hidden_states)
+        hidden_states = self.conv1d_1(input_tensor)
+        hidden_states = self.activation(hidden_states)
 
-        hidden_states = self.dense_2(hidden_states)
+        hidden_states = self.conv1d_2(hidden_states)
+        hidden_states = self.activation(hidden_states)
         hidden_states = self.dropout(hidden_states)
         hidden_states = self.LayerNorm(hidden_states + input_tensor)
 
@@ -209,8 +187,6 @@ class DisentangledEncoder(nn.Module):
         # prototypical intention vector for each intention
         self.prototypes = nn.ParameterList([nn.Parameter(torch.zeros(args.hidden_size))
                                             for _ in range(args.num_intents)])
-        # self.prototypes = torch.cat(self.prototypes, 1)
-        # self.prototypes = tf.transpose(self.prototypes)
 
         self.layernorm1 = LayerNorm(args.hidden_size, eps=1e-12)
         self.layernorm2 = LayerNorm(args.hidden_size, eps=1e-12)
@@ -220,24 +196,16 @@ class DisentangledEncoder(nn.Module):
 
         self.w = nn.Linear(args.hidden_size, args.hidden_size)
 
-        # self.b = BiasLayer(d_model, 'zeros')
         self.b_prime = BiasLayer(args.hidden_size, 'zeros')
 
         # individual alpha for each position
         self.alphas = nn.Parameter(torch.zeros(args.max_seq_length, args.hidden_size))
-        # self.alphas = tf.concat(self.alphas, 1)
-        # self.alphas = tf.transpose(self.alphas)
 
         self.beta_input_seq = nn.Parameter(torch.randn(args.num_intents, args.hidden_size) *
                                            (1 / np.sqrt(args.hidden_size)))
 
-        # self.beta_input_seq = tf.concat(self.beta_input_seq, 1)
-        # self.beta_input_seq = tf.transpose(self.beta_input_seq)
-
         self.beta_label_seq = nn.Parameter(torch.randn(args.num_intents, args.hidden_size) *
                                            (1 / np.sqrt(args.hidden_size)))
-        # self.beta_label_seq = tf.concat(self.beta_label_seq, 1)
-        # self.beta_label_seq = tf.transpose(self.beta_label_seq)
 
     def intention_clustering(self, z):
         """

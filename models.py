@@ -130,8 +130,3 @@ class EduRecModel(nn.Module):
             module.weight.data.fill_(1.0)
         if isinstance(module, nn.Linear) and module.bias is not None:
             module.bias.data.zero_()
-
-#
-# class RNNModel(nn.Module):
-#     def __init__(self, args):
-#         super(RNNModel, self).__init__()

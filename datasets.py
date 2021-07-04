@@ -4,7 +4,6 @@ Script used for preparing dataset for pre-training and fine-tuning the model
 @author: Abinash Sinha
 """
 
-import random
 import torch
 from torch.utils.data import Dataset
 
