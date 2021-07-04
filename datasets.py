@@ -12,10 +12,9 @@ from utils import neg_sample
 
 class PretrainDataset(Dataset):
 
-    def __init__(self, args, user_seq, long_sequence):
+    def __init__(self, args, user_seq):
         self.args = args
         self.user_seq = user_seq
-        self.long_sequence = long_sequence
         self.max_len = args.max_seq_length
         self.part_sequence = []
         self.split_sequence()

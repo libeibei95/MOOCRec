@@ -4,6 +4,7 @@ Script for pre-training the data
 @author: Abinash Sinha
 """
 
+import torch
 from torch.utils.data import DataLoader, RandomSampler
 
 import os
@@ -61,14 +62,14 @@ def main():
 
     args = parser.parse_args()
 
-    # set_seed(args.seed)
+    set_seed(args.seed)
     check_path(args.output_dir)
 
-    # os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
-    # args.cuda_condition = torch.cuda.is_available() and not args.no_cuda
+    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
+    args.cuda_condition = torch.cuda.is_available() and not args.no_cuda
 
     args.data_file = os.path.join(args.data_dir, args.data_name + '.csv')
-    # concat all user_seq get a long sequence, from which sample neg segment for SP
+
     user_seq, max_item, long_sequence = get_user_seqs_long_csv(args.data_file)
 
     args.item_size = max_item + 2
@@ -85,7 +86,7 @@ def main():
 
     for epoch in range(args.pre_epochs):
 
-        pretrain_dataset = PretrainDataset(args, user_seq, long_sequence)
+        pretrain_dataset = PretrainDataset(args, user_seq)
         pretrain_sampler = RandomSampler(pretrain_dataset)
         pretrain_dataloader = DataLoader(pretrain_dataset, sampler=pretrain_sampler, batch_size=args.pre_batch_size)
 
