@@ -127,10 +127,12 @@ class PointWiseFeedForward(nn.Module):
 
     def forward(self, input_tensor):
 
-        hidden_states = self.conv1d_1(input_tensor)
+        hidden_states = self.conv1d_1(input_tensor.transpose(1, 2))
+        hidden_states = hidden_states.transpose(1, 2)
         hidden_states = self.activation(hidden_states)
 
-        hidden_states = self.conv1d_2(hidden_states)
+        hidden_states = self.conv1d_2(hidden_states.transpose(1, 2))
+        hidden_states = hidden_states.transpose(1, 2)
         hidden_states = self.activation(hidden_states)
         hidden_states = self.dropout(hidden_states)
         hidden_states = self.LayerNorm(hidden_states + input_tensor)
@@ -272,6 +274,8 @@ class DisentangledEncoder(nn.Module):
             disentangled_encoding = self.beta_input_seq + torch.matmul(attention_weights_transpose, z)
         else:
             disentangled_encoding = self.beta_label_seq + torch.matmul(attention_weights_transpose, z)
+
+        disentangled_encoding = self.layernorm5(disentangled_encoding)
 
         return disentangled_encoding  # [K, D]
 
