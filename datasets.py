@@ -69,7 +69,7 @@ class PretrainDataset(Dataset):
         return cur_tensors
 
 
-class SASRecDataset(Dataset):
+class FineTrainDataset(Dataset):
 
     def __init__(self, args, user_seq, test_neg_items=None, data_type='train'):
         self.args = args
