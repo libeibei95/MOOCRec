@@ -23,7 +23,7 @@ def main():
     parser.add_argument('--data_dir', default='data', type=str)
     parser.add_argument('--output_dir', default='output', type=str)
     parser.add_argument('--data_name', default='MOOCCube', type=str)
-    parser.add_argument('--do_eval', default='False')
+    parser.add_argument('--do_eval', action='store_true')
     parser.add_argument('--ckp', default=30, type=int, help="pretrain epochs 10, 20, 30...")
 
     # model args
