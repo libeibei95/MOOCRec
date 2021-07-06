@@ -12,17 +12,18 @@ from sklearn import preprocessing
 from collections import defaultdict
 
 
+def get_csv_video_ids(x):
+    student_video_ids_list = [activity['video_id'] for activity in x]
+    student_video_ids_list = ','.join(student_video_ids_list)
+
+    return student_video_ids_list
+
+
 def prepare_user_items_sequences():
     data_name = 'MOOCCube'
     if not os.path.exists('MOOCCube_orig.csv'):
         chunks = pd.read_json('MOOCCube.json', lines=True, chunksize=2000)
         header = True
-
-        def get_csv_video_ids(x):
-            student_video_ids_list = [activity['video_id'] for activity in x]
-            student_video_ids_list = ','.join(student_video_ids_list)
-
-            return student_video_ids_list
 
         def get_num_videos(x):
             video_ids_list = x.split(',')
@@ -121,6 +122,7 @@ def sample_test_data(data_name, test_num=99, sample_type='random'):
             sample_ids = [str(item) for item in sample_ids if item not in user_seq and item not in test_samples]
             test_samples.extend(sample_ids)
         test_samples = test_samples[:test_num]
+        test_samples = ','.join(test_samples)
         user_neg_items[user] = test_samples
 
     neg_items_df = pd.DataFrame(user_neg_items.items(), columns=['id', 'video_ids'])
