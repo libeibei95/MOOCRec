@@ -2,5 +2,5 @@
 EduRec: Disentangled Self-Supervision for Recommending Videos in MOOCs
 
 Student: Abinash Sinha
-Mentor: Dr. Shalini Pandey
+<br>Mentor: Dr. Shalini Pandey
 <br>Advisor: Dr. Jaideep Srivastava
