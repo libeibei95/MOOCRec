@@ -99,7 +99,7 @@ class Trainer:
         # [batch*seq_len hidden_size]
         pos = pos_emb.view(-1, pos_emb.size(2))
         neg = neg_emb.view(-1, neg_emb.size(2))
-        seq_emb = seq_out.view(-1, self.args.hidden_size)  # [batch*seq_len hidden_size]
+        seq_emb = seq_out.reshape(-1, self.args.hidden_size)  # [batch*seq_len hidden_size]
         pos_logits = torch.sum(pos * seq_emb, -1)  # [batch*seq_len]
         neg_logits = torch.sum(neg * seq_emb, -1)
         istarget = (pos_ids > 0).view(pos_ids.size(0) * self.model.args.max_seq_length).float()  # [batch*seq_len]
