@@ -194,7 +194,7 @@ def get_user_seqs_and_sample(data_file, sample_file):
     sample_seq = []
     for _, row in sample_df.iterrows():
         items = row['video_ids'].split(',')
-        user_seq.append(items)
+        sample_seq.append(items)
         item_set = item_set | set(items)
 
     assert len(user_seq) == len(sample_seq)
