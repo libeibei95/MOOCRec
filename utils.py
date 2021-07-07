@@ -68,13 +68,13 @@ class EarlyStopping:
                 return False
         return True
 
-    def __call__(self, score, model):
+    def __call__(self, score, model, epoch):
         # score HIT@10 NDCG@10
 
         if self.best_score is None:
             self.best_score = score
             self.score_min = np.array([0] * len(score))
-            self.save_checkpoint(score, model)
+            self.save_checkpoint(score, model, epoch)
         elif self.compare(score):
             self.counter += 1
             print(f'EarlyStopping counter: {self.counter} out of {self.patience}')
@@ -82,14 +82,14 @@ class EarlyStopping:
                 self.early_stop = True
         else:
             self.best_score = score
-            self.save_checkpoint(score, model)
+            self.save_checkpoint(score, model, epoch)
             self.counter = 0
 
-    def save_checkpoint(self, score, model):
+    def save_checkpoint(self, score, model, epoch):
         '''Saves model when validation loss decrease.'''
         if self.verbose:
             # ({self.score_min:.6f} --> {score:.6f}) # 这里如果是一个值的话输出才不会有问题
-            print(f'Validation score increased.  Saving model ...')
+            print(f'Validation score increased.  Saving model of {epoch+1}...')
         torch.save(model.state_dict(), self.checkpoint_path)
         self.score_min = score
 
@@ -139,6 +139,7 @@ def get_user_seqs_csv(data_file):
     user_set = set()
     for _, row in data_df.iterrows():
         items = row['video_ids'].split(',')
+        items = [int(item) for item in items]
         user_seq.append(items)
         item_set = item_set | set(items)
         user_set.add(row['id'])
