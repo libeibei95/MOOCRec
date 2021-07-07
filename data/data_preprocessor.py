@@ -10,25 +10,26 @@ import pandas as pd
 import numpy as np
 from sklearn import preprocessing
 from collections import defaultdict
+from itertools import zip_longest
 
 
-def get_csv_video_ids(x):
-    student_video_ids_list = [activity['video_id'] for activity in x]
-    student_video_ids_list = ','.join(student_video_ids_list)
+def get_num_videos(x):
+    video_ids_list = x.split(',')
 
-    return student_video_ids_list
+    return len(video_ids_list)
 
 
 def prepare_user_items_sequences():
-    data_name = 'MOOCCube'
+    d_name = 'MOOCCube'
     if not os.path.exists('MOOCCube_orig.csv'):
         chunks = pd.read_json('MOOCCube.json', lines=True, chunksize=2000)
         header = True
 
-        def get_num_videos(x):
-            video_ids_list = x.split(',')
+        def get_csv_video_ids(x):
+            student_video_ids_list = [activity['video_id'] for activity in x]
+            student_video_ids_list = ','.join(student_video_ids_list)
 
-            return len(video_ids_list)
+            return student_video_ids_list
 
         for c in chunks:
             activities_list = c['activity']
@@ -79,12 +80,12 @@ def prepare_user_items_sequences():
             return new_video_ids
 
     mooccube_df['video_ids'] = mooccube_df['video_ids'].apply(label_transform)
-    mooccube_df.to_csv(data_name + '.csv', index=False)
+    mooccube_df.to_csv(f'{d_name}_repeated.csv', index=False)
 
-    return data_name
+    return d_name
 
 
-def sample_test_data(data_name, test_num=99, sample_type='random'):
+def sample_test_data(d_name='MOOCCube', test_num=99, sample_type='random'):
     """
     sample_type:
         random:  sample `test_num` negative items randomly.
@@ -92,8 +93,8 @@ def sample_test_data(data_name, test_num=99, sample_type='random'):
     """
     np.random.seed(12345)
 
-    data_file = f'{data_name}.csv'
-    test_file = f'{data_name}_sample.csv'
+    data_file = f'{d_name}.csv'
+    test_file = f'{d_name}_sample.csv'
 
     item_count = defaultdict(int)
     user_items = defaultdict()
@@ -129,6 +130,23 @@ def sample_test_data(data_name, test_num=99, sample_type='random'):
     neg_items_df.to_csv(test_file, index=False)
 
 
+def remove_consecutive_repititions(d_name='MOOCCube'):
+    mooccube_df = pd.read_csv(f'{d_name}_repeated.csv')
+
+    def remove_repititions(x):
+        x = x.split(',')
+        x = [i for i, j in zip_longest(x, x[1:]) if i != j]
+        x = ','.join(x)
+
+        return x
+
+    mooccube_df['video_ids'] = mooccube_df['video_ids'].apply(remove_repititions)
+    mooccube_df['num_video_ids'] = mooccube_df['video_ids'].apply(get_num_videos)
+
+    mooccube_df.to_csv(f'{d_name}.csv', index=False)
+
+
 if __name__ == '__main__':
     data_name = prepare_user_items_sequences()
+    remove_consecutive_repititions(data_name)
     sample_test_data(data_name)
