@@ -1,11 +1,11 @@
 # MOOCRec
 *MOOCRec*: Disentangled Self-Supervision for Recommending Videos in MOOCs
 
-Student: Abinash Sinha
+Student: [*Abinash Sinha*](https://www.linkedin.com/in/abinashsinha330/)
 <br>Mentor: Dr. Shalini Pandey
-<br>Advisor: Dr. Jaideep Srivastava
+<br>Advisor: [*Dr. Jaideep Srivastava*](https://cse.umn.edu/cs/jaideep-srivastava)
 
-Disentangled self-supervision is used as formulated in the paper, ["**Disentangled Self-Supervision in Sequential Recommenders"**](http://pengcui.thumedialab.com/papers/DisentangledSequentialRecommendation.pdf)  
+Disentangled self-supervision is used as formulated in the paper, ["***Disentangled Self-Supervision in Sequential Recommenders"***](http://pengcui.thumedialab.com/papers/DisentangledSequentialRecommendation.pdf)  
 Existing techniques used in sequential recommenders, usually adopt sequence-to-item training strategy, which supervises  a sequence model with a user’s next behavior as the label
 and the user’s past behaviors as the input.  
 Sequence-to-item training strategy is myopic and usually produces non-diverse recommendations. This paper addresses these challenges by adding a sequence-to-sequence training strategy
@@ -20,13 +20,14 @@ pip install -r requirements.txt
 
 ## Data Preprocessing
 ```shell script
+./data/data_preprocessor.py
+```
 data preprocessor to 
 1. label encode video ids
 2. calculate number of videos watched by each student
 3. remove consecutive repetitions of video ids for each student (if asked to do)
 3. perform negative sampling for testing purpose
-./data/data_preprocessor.py
-```
+
 
 **MOOCCube.csv** has 3 columns:
 1. *id*: student id
