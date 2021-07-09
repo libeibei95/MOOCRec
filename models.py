@@ -25,54 +25,84 @@ class EduRecModel(nn.Module):
         self.apply(self.init_weights)
 
     def seq2seqloss(self, inp_subseq_encodings, label_subseq_encodings):
+        sqrt_hidden_size = np.sqrt(self.args.hidden_size)
         product = torch.mul(inp_subseq_encodings, label_subseq_encodings)  # [B, K, D]
-        normalized_dot_product = torch.sum(product, dim=-1) / np.sqrt(self.args.hidden_size)  # [B, K]
+        normalized_dot_product = torch.sum(product, dim=-1) / sqrt_hidden_size  # [B, K]
         numerator = torch.exp(normalized_dot_product)  # [B, K]
-        num_users = numerator.shape[0]
+        inp_subseq_encodings_trans = inp_subseq_encodings.transpose(0, 1)
+        inp_subseq_encodings_trans_expanded = inp_subseq_encodings_trans.unsqueeze(1) # [K, 1, B, D]
+        label_subseq_encodings_trans = label_subseq_encodings.transpose(0, 1).transpose(1, 2) # [K, D, B]
+        dot_products = torch.matmul(inp_subseq_encodings_trans_expanded, label_subseq_encodings_trans) # [K, K, B, B]
+        dot_products = torch.exp(dot_products / sqrt_hidden_size)
+        dot_products = dot_products.sum(-1) # [K, K, B]
+        temp = dot_products.sum(1) # [K, B]
+        denominator = temp.transpose(0, 1) # [B, K]
+        # denominator = None
+        # for k in range(self.args.num_intents):
+        #     curr_k_inp_subseq_encodings = inp_subseq_encodings_trans[k, :, :]
+        #     dot_products = torch.matmul(curr_k_inp_subseq_encodings, label_subseq_encodings_trans) # [K, B, B]
+        #     dot_products = torch.exp(dot_products / sqrt_hidden_size) # [K, B, B]
+        #     dot_products = dot_products.sum(-1) # [K, B]
+        #     temp = dot_products.transpose(0, 1) # [B, K]
+        #     temp = temp.sum(-1).unsqueeze(-1)
+        #     if k == 0:
+        #         denominator = temp
+        #     else:
+        #         denominator = torch.cat((denominator, temp), -1)
 
-        denominator = None
-        for u in range(num_users):
-            denominator_k = None
-            for k in range(self.args.num_intents):
-                temp = torch.mul(inp_subseq_encodings[u, k, :], label_subseq_encodings)
-                temp = torch.exp(temp.sum(-1) / np.sqrt(self.args.hidden_size))
-                temp = temp.sum()
-                if k == 0:
-                    denominator_k = temp.unsqueeze(-1)
-                else:
-                    denominator_k = torch.cat((denominator_k, temp.unsqueeze(-1)), -1)
-            if u == 0:
-                denominator = denominator_k.unsqueeze(0)
-            else:
-                denominator = torch.cat((denominator, denominator_k.unsqueeze(0)), 0)
-        # [B, K]
+        # denominator = None
+        # for u in range(num_users):
+        #     denominator_k = None
+        #     for k in range(self.args.num_intents):
+        #         temp = torch.mul(inp_subseq_encodings[u, k, :], label_subseq_encodings)
+        #         temp = torch.exp(temp.sum(-1) / np.sqrt(self.args.hidden_size))
+        #         temp = temp.sum()
+        #         if k == 0:
+        #             denominator_k = temp.unsqueeze(-1)
+        #         else:
+        #             denominator_k = torch.cat((denominator_k, temp.unsqueeze(-1)), -1)
+        #     if u == 0:
+        #         denominator = denominator_k.unsqueeze(0)
+        #     else:
+        #         denominator = torch.cat((denominator, denominator_k.unsqueeze(0)), 0)
         seq2seq_loss_k = -torch.log2(numerator / denominator)
         thresh = np.floor(self.args.lambda_ * self.args.pre_batch_size * self.args.num_intents)
         conf_indicator = seq2seq_loss_k <= thresh
         conf_seq2seq_loss_k = torch.mul(seq2seq_loss_k, conf_indicator)
         seq2seq_loss = torch.sum(conf_seq2seq_loss_k)
-
+        # 3150.5906
         return seq2seq_loss
 
     def seq2itemloss(self, inp_subseq_encodings, next_item_emb):
+        sqrt_hidden_size = np.sqrt(self.args.hidden_size)
         next_item_emb = torch.transpose(next_item_emb, 1, 2)
         dot_product = torch.matmul(inp_subseq_encodings, next_item_emb)  # [B, K, 1]
-        exp_normalized_dot_product = torch.exp(dot_product / np.sqrt(self.args.hidden_size))
+        exp_normalized_dot_product = torch.exp(dot_product / sqrt_hidden_size)
         numerator = torch.max(exp_normalized_dot_product, dim=1)[0]  # [B, 1]
-        num_users = next_item_emb.shape[0]
-        denominator = None
-        for u in range(num_users):
-            temp = torch.exp(
-                torch.matmul(
-                    inp_subseq_encodings[u, :, :],
-                    next_item_emb) / np.sqrt(self.args.hidden_size)
-            ).sum().unsqueeze(-1)
-            if u == 0:
-                denominator = temp
-            else:
-                denominator = torch.cat((denominator, temp), -1)
 
-        denominator = denominator.unsqueeze(-1)  # [B, 1]
+        inp_subseq_encodings_trans = inp_subseq_encodings.transpose(0, 1) # [K, B, D]
+        next_item_emb_trans = next_item_emb.squeeze(-1).transpose(0, 1) # [D, B]
+        # sum of dot products of every input sequence encoding for each intent with all next item embeddings
+        dot_products = torch.matmul(inp_subseq_encodings_trans,
+                                    next_item_emb_trans).sum(-1) / sqrt_hidden_size # [K, B]
+        dot_products = torch.exp(dot_products) # [K, B]
+        dot_products = dot_products.transpose(0, 1) # [B, K]
+        # sum across all intents
+        denominator = dot_products.sum(-1).unsqueeze(-1) # [B, 1]
+        # num_users = next_item_emb.shape[0]
+        # denominator = None
+        # for u in range(num_users):
+        #     temp = torch.exp(
+        #         torch.matmul(
+        #             inp_subseq_encodings[u, :, :],
+        #             next_item_emb) / np.sqrt(self.args.hidden_size)
+        #     ).sum().unsqueeze(-1)
+        #     if u == 0:
+        #         denominator = temp
+        #     else:
+        #         denominator = torch.cat((denominator, temp), -1)
+        #
+        # denominator = denominator.unsqueeze(-1)  # [B, 1]
         seq2item_loss_k = -torch.log2(numerator / denominator)  # [B, 1]
         seq2item_loss = torch.sum(seq2item_loss_k)
 
