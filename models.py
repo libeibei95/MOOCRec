@@ -75,7 +75,7 @@ class EduRecModel(nn.Module):
 
     def seq2itemloss(self, inp_subseq_encodings, next_item_emb):
         sqrt_hidden_size = np.sqrt(self.args.hidden_size)
-        next_item_emb = torch.transpose(next_item_emb, 1, 2)
+        next_item_emb = torch.transpose(next_item_emb, 1, 2) # [B, D, 1]
         dot_product = torch.matmul(inp_subseq_encodings, next_item_emb)  # [B, K, 1]
         exp_normalized_dot_product = torch.exp(dot_product / sqrt_hidden_size)
         numerator = torch.max(exp_normalized_dot_product, dim=1)[0]  # [B, 1]
@@ -84,8 +84,9 @@ class EduRecModel(nn.Module):
         next_item_emb_trans = next_item_emb.squeeze(-1).transpose(0, 1) # [D, B]
         # sum of dot products of every input sequence encoding for each intent with all next item embeddings
         dot_products = torch.matmul(inp_subseq_encodings_trans,
-                                    next_item_emb_trans).sum(-1) / sqrt_hidden_size # [K, B]
-        dot_products = torch.exp(dot_products) # [K, B]
+                                    next_item_emb_trans) / sqrt_hidden_size # [K, B, B]
+        dot_products = torch.exp(dot_products) # [K, B, B]
+        dot_products = dot_products.sum(-1)
         dot_products = dot_products.transpose(0, 1) # [B, K]
         # sum across all intents
         denominator = dot_products.sum(-1).unsqueeze(-1) # [B, 1]
