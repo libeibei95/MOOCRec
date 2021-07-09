@@ -66,7 +66,9 @@ class EduRecModel(nn.Module):
         #     else:
         #         denominator = torch.cat((denominator, denominator_k.unsqueeze(0)), 0)
         seq2seq_loss_k = -torch.log2(numerator / denominator)
-        thresh = np.floor(self.args.lambda_ * self.args.pre_batch_size * self.args.num_intents)
+        seq2seq_loss_k = torch.flatten(seq2seq_loss_k)
+        thresh_th = int(np.floor(self.args.lambda_ * self.args.pre_batch_size * self.args.num_intents))
+        thresh = torch.kthvalue(seq2seq_loss_k, thresh_th)[0]
         conf_indicator = seq2seq_loss_k <= thresh
         conf_seq2seq_loss_k = torch.mul(seq2seq_loss_k, conf_indicator)
         seq2seq_loss = torch.sum(conf_seq2seq_loss_k)
