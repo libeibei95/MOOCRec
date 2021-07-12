@@ -9,6 +9,8 @@ import torch
 import torch.nn as nn
 from modules import DisentangledEncoder, SASEncoder, LayerNorm
 
+torch.set_printoptions(profile="full")
+
 
 class EduRecModel(nn.Module):
     def __init__(self, args):
@@ -19,7 +21,10 @@ class EduRecModel(nn.Module):
         self.disentangled_encoder = DisentangledEncoder(args)
         self.LayerNorm = LayerNorm(args.hidden_size, eps=1e-12)
         self.dropout = nn.Dropout(args.hidden_dropout_prob)
+
         self.args = args
+        self.seq2seq_w = nn.Linear(args.hidden_size, args.hidden_size, bias=False)
+        self.seq2item_w = nn.Linear(args.hidden_size, args.hidden_size, bias=False)
 
         self.criterion = nn.BCELoss(reduction='none')
         self.apply(self.init_weights)
@@ -30,13 +35,13 @@ class EduRecModel(nn.Module):
         normalized_dot_product = torch.sum(product, dim=-1) / sqrt_hidden_size  # [B, K]
         numerator = torch.exp(normalized_dot_product)  # [B, K]
         inp_subseq_encodings_trans = inp_subseq_encodings.transpose(0, 1)
-        inp_subseq_encodings_trans_expanded = inp_subseq_encodings_trans.unsqueeze(1) # [K, 1, B, D]
-        label_subseq_encodings_trans = label_subseq_encodings.transpose(0, 1).transpose(1, 2) # [K, D, B]
-        dot_products = torch.matmul(inp_subseq_encodings_trans_expanded, label_subseq_encodings_trans) # [K, K, B, B]
+        inp_subseq_encodings_trans_expanded = inp_subseq_encodings_trans.unsqueeze(1)  # [K, 1, B, D]
+        label_subseq_encodings_trans = label_subseq_encodings.transpose(0, 1).transpose(1, 2)  # [K, D, B]
+        dot_products = torch.matmul(inp_subseq_encodings_trans_expanded, label_subseq_encodings_trans)  # [K, K, B, B]
         dot_products = torch.exp(dot_products / sqrt_hidden_size)
-        dot_products = dot_products.sum(-1) # [K, K, B]
-        temp = dot_products.sum(1) # [K, B]
-        denominator = temp.transpose(0, 1) # [B, K]
+        dot_products = dot_products.sum(-1)  # [K, K, B]
+        temp = dot_products.sum(1)  # [K, B]
+        denominator = temp.transpose(0, 1)  # [B, K]
         # denominator = None
         # for k in range(self.args.num_intents):
         #     curr_k_inp_subseq_encodings = inp_subseq_encodings_trans[k, :, :]
@@ -73,25 +78,28 @@ class EduRecModel(nn.Module):
         conf_seq2seq_loss_k = torch.mul(seq2seq_loss_k, conf_indicator)
         seq2seq_loss = torch.sum(conf_seq2seq_loss_k)
         # 3150.5906
+
+        # print(numerator)
+        # print(denominator)
         return seq2seq_loss
 
     def seq2itemloss(self, inp_subseq_encodings, next_item_emb):
         sqrt_hidden_size = np.sqrt(self.args.hidden_size)
-        next_item_emb = torch.transpose(next_item_emb, 1, 2) # [B, D, 1]
+        next_item_emb = torch.transpose(next_item_emb, 1, 2)  # [B, D, 1]
         dot_product = torch.matmul(inp_subseq_encodings, next_item_emb)  # [B, K, 1]
         exp_normalized_dot_product = torch.exp(dot_product / sqrt_hidden_size)
         numerator = torch.max(exp_normalized_dot_product, dim=1)[0]  # [B, 1]
 
-        inp_subseq_encodings_trans = inp_subseq_encodings.transpose(0, 1) # [K, B, D]
-        next_item_emb_trans = next_item_emb.squeeze(-1).transpose(0, 1) # [D, B]
+        inp_subseq_encodings_trans = inp_subseq_encodings.transpose(0, 1)  # [K, B, D]
+        next_item_emb_trans = next_item_emb.squeeze(-1).transpose(0, 1)  # [D, B]
         # sum of dot products of every input sequence encoding for each intent with all next item embeddings
         dot_products = torch.matmul(inp_subseq_encodings_trans,
-                                    next_item_emb_trans) / sqrt_hidden_size # [K, B, B]
-        dot_products = torch.exp(dot_products) # [K, B, B]
+                                    next_item_emb_trans) / sqrt_hidden_size  # [K, B, B]
+        dot_products = torch.exp(dot_products)  # [K, B, B]
         dot_products = dot_products.sum(-1)
-        dot_products = dot_products.transpose(0, 1) # [B, K]
+        dot_products = dot_products.transpose(0, 1)  # [B, K]
         # sum across all intents
-        denominator = dot_products.sum(-1).unsqueeze(-1) # [B, 1]
+        denominator = dot_products.sum(-1).unsqueeze(-1)  # [B, 1]
         # num_users = next_item_emb.shape[0]
         # denominator = None
         # for u in range(num_users):
@@ -108,8 +116,71 @@ class EduRecModel(nn.Module):
         # denominator = denominator.unsqueeze(-1)  # [B, 1]
         seq2item_loss_k = -torch.log2(numerator / denominator)  # [B, 1]
         seq2item_loss = torch.sum(seq2item_loss_k)
-
+        # if torch.isnan(seq2item_loss):
+        # print(numerator)
+        # print(denominator)
         return seq2item_loss
+
+    def mim_seq2item_loss(self, inp_subseq_encodings, next_item_emb, neg_next_item_emb):
+        """
+        Sequence-to-item loss based on Mutual Information Maximization
+        :param inp_subseq_encodings:
+        :param next_item_emb:
+        :return:
+        """
+        # find intention which is highly possible given next_item_emb
+        dot_product = torch.mul(inp_subseq_encodings, next_item_emb).sum(-1)  # [B, K]
+        max_intention_idxs = torch.max(dot_product, dim=-1)[1]  # [B]
+        max_inp_subseq_encodings = inp_subseq_encodings[torch.arange(inp_subseq_encodings.size(0)),
+                                                        max_intention_idxs]  # [B, D]
+        pos_context = self.seq2item_w(max_inp_subseq_encodings)
+        pos_score = torch.mul(pos_context, next_item_emb.squeeze(-1))  # [B D]
+        pos_score = torch.sigmoid(torch.sum(pos_score, dim=-1))
+
+        dot_product = torch.mul(inp_subseq_encodings, neg_next_item_emb).sum(-1)  # [B, K]
+        max_intention_idxs = torch.max(dot_product, dim=-1)[1]  # [B]
+        max_inp_subseq_encodings = inp_subseq_encodings[torch.arange(inp_subseq_encodings.size(0)),
+                                                        max_intention_idxs]  # [B, D]
+        neg_context = self.seq2item_w(max_inp_subseq_encodings)
+        neg_score = torch.mul(neg_context, next_item_emb.squeeze(-1))
+        neg_score = torch.sigmoid(torch.sum(neg_score, dim=-1))
+
+        seq2item_distance = torch.sigmoid(pos_score - neg_score)
+
+        mim_seq2item_loss = torch.sum(self.criterion(seq2item_distance,
+                                                     torch.ones_like(seq2item_distance,
+                                                                     dtype=torch.float32)))
+
+        return mim_seq2item_loss  # [B]
+
+    def mim_seq2seq_loss(self, inp_subseq_encodings, label_subseq_encodings, neg_label_subseq_encodings):
+        """
+        Sequence-to-sequence loss based on Mutual Information Maximization
+        :param inp_subseq_encodings:
+        :param label_subseq_encodings:
+        :param neg_label_subseq_encodings:
+        :return:
+        """
+
+        context = self.seq2seq_w(inp_subseq_encodings) # [B, K, D]
+
+        pos_score = torch.mul(context, label_subseq_encodings)
+        pos_score = torch.sum(pos_score, dim=-1)
+        pos_score = pos_score.view(-1) # [B*K]
+        pos_score = torch.sigmoid(pos_score) # [B*K]
+
+        neg_score = torch.mul(context, neg_label_subseq_encodings)
+        neg_score = torch.sum(neg_score, dim=-1)
+        neg_score = neg_score.view(-1) # [B*K]
+        neg_score = torch.sigmoid(neg_score) # [B*K]
+
+        seq2seq_distance = torch.sigmoid(pos_score - neg_score)
+
+        mim_seq2seq_loss = torch.sum(self.criterion(seq2seq_distance,
+                                                    torch.ones_like(seq2seq_distance,
+                                                                    dtype=torch.float32)))
+
+        return mim_seq2seq_loss  # [B]
 
     def add_position_embedding(self, sequence):
 
@@ -124,9 +195,11 @@ class EduRecModel(nn.Module):
 
         return sequence_emb
 
-    def pretrain(self, inp_pos_items, label_pos_items, next_pos_item):
+    def pretrain(self, inp_pos_items, label_pos_items, label_neg_items,
+                 next_pos_item, next_neg_item):
 
         next_item_emb = self.item_embeddings(next_pos_item)  # [B, 1, D]
+        next_neg_item_emb = self.item_embeddings(next_neg_item)  # [B, 1, D]
 
         # Encode masked sequence
         inp_sequence_emb = self.add_position_embedding(inp_pos_items)
@@ -137,6 +210,10 @@ class EduRecModel(nn.Module):
         label_sequence_mask = (label_pos_items == 0).float() * -1e8
         label_sequence_mask = torch.unsqueeze(torch.unsqueeze(label_sequence_mask, 1), 1)
 
+        neg_label_sequence_emb = self.add_position_embedding(label_neg_items)
+        neg_label_sequence_mask = (label_neg_items == 0).float() * -1e8
+        neg_label_sequence_mask = torch.unsqueeze(torch.unsqueeze(neg_label_sequence_mask, 1), 1)
+
         inp_seq_encodings = self.disentangled_encoder(True,
                                                       inp_sequence_emb,
                                                       inp_sequence_mask,
@@ -146,6 +223,10 @@ class EduRecModel(nn.Module):
                                                         label_sequence_emb,
                                                         label_sequence_mask,
                                                         output_all_encoded_layers=True)
+        neg_label_seq_encodings = self.disentangled_encoder(False,
+                                                            neg_label_sequence_emb,
+                                                            neg_label_sequence_mask,
+                                                            output_all_encoded_layers=True)
 
         # seq2item loss
         seq2item_loss = self.seq2itemloss(inp_seq_encodings, next_item_emb)
@@ -153,7 +234,15 @@ class EduRecModel(nn.Module):
         # seq2seq loss
         seq2seq_loss = self.seq2seqloss(inp_seq_encodings, label_seq_encodings)
 
-        return seq2item_loss, seq2seq_loss
+        # MIM-based seq2item loss
+        mim_seq2item_loss = self.mim_seq2item_loss(inp_seq_encodings, next_item_emb,
+                                                   next_neg_item_emb)
+
+        # MIM-based seq2seq loss
+        mim_seq2seq_loss = self.mim_seq2seq_loss(inp_seq_encodings, label_seq_encodings,
+                                                 neg_label_seq_encodings)
+
+        return seq2item_loss, seq2seq_loss, mim_seq2item_loss, mim_seq2seq_loss
 
     # Fine tune
     # same as SASRec

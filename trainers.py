@@ -150,17 +150,27 @@ class PretrainTrainer(Trainer):
         self.model.train()
         seq2item_loss_avg = 0.0
         seq2seq_loss_avg = 0.0
+        mim_seq2item_loss_avg = 0.0
+        mim_seq2seq_loss_avg = 0.0
         total_loss_avg = 0.0
 
         for i, batch in pretrain_data_iter:
             # 0. batch_data will be sent into the device(GPU or CPU)
             batch = tuple(t.to(self.device) for t in batch)
-            inp_pos_items, label_pos_items, next_pos_item = batch
+            inp_pos_items, label_pos_items, label_neg_items, next_pos_item, next_neg_item = batch
 
-            seq2item_loss, seq2seq_loss = self.model.pretrain(inp_pos_items, label_pos_items, next_pos_item)
+            seq2item_loss, seq2seq_loss, \
+            mim_seq2item_loss, mim_seq2seq_loss = self.model.pretrain(inp_pos_items,
+                                                                      label_pos_items,
+                                                                      label_neg_items,
+                                                                      next_pos_item,
+                                                                      next_neg_item)
 
-            joint_loss = self.args.s2i_weight * seq2item_loss + \
-                         self.args.s2s_weight * seq2seq_loss
+            # joint_loss = self.args.s2i_weight * seq2item_loss + \
+            #              self.args.s2s_weight * seq2seq_loss
+
+            joint_loss = self.args.s2i_weight * mim_seq2item_loss + \
+                         self.args.s2s_weight * mim_seq2seq_loss
 
             self.optim.zero_grad()
             joint_loss.backward()
@@ -169,14 +179,18 @@ class PretrainTrainer(Trainer):
             # print('seq2seq loss', seq2seq_loss.item())
             seq2item_loss_avg += seq2item_loss.item()
             seq2seq_loss_avg += seq2seq_loss.item()
-            total_loss_avg += (seq2item_loss_avg + seq2seq_loss_avg)
+            mim_seq2item_loss_avg += mim_seq2item_loss.item()
+            mim_seq2seq_loss_avg += mim_seq2seq_loss.item()
+            total_loss_avg += joint_loss.item()
 
         num = len(pretrain_data_iter) * self.args.pre_batch_size
         post_fix = {
             "epoch": epoch,
             "seq2item_loss_avg": '{:.4f}'.format(seq2item_loss_avg / num),
             "seq2seq_loss_avg": '{:.4f}'.format(seq2seq_loss_avg / num),
-            "total_loss_avg": '{:.4f}'.format(total_loss_avg / num)
+            "mim_seq2item_loss_avg": '{:.4f}'.format(mim_seq2item_loss_avg / num),
+            "mim_seq2seq_loss_avg": '{:.4f}'.format(mim_seq2seq_loss_avg / num),
+            "mim_total_loss_avg": '{:.4f}'.format(total_loss_avg / num)
         }
         print(desc)
         print(str(post_fix))

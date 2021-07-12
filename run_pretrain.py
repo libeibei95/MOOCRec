@@ -4,7 +4,6 @@ Script for pre-training the data
 @author: Abinash Sinha
 """
 
-import torch
 from torch.utils.data import DataLoader, RandomSampler
 
 import os
@@ -49,7 +48,7 @@ def main():
 
     # pre train args
     parser.add_argument("--pre_epochs", type=int, default=300, help="number of pre_train epochs")
-    parser.add_argument("--pre_batch_size", type=int, default=100)
+    parser.add_argument("--pre_batch_size", type=int, default=128)
     parser.add_argument('--ckp', default=20, type=int, help="pretrain epochs 10, 20, 30...")
 
     parser.add_argument("--mask_p", type=float, default=0.2, help="mask probability")
@@ -63,15 +62,15 @@ def main():
 
     args = parser.parse_args()
 
-    set_seed(args.seed)
-    check_path(args.output_dir)
-
-    os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
-    args.cuda_condition = torch.cuda.is_available() and not args.no_cuda
+    # set_seed(args.seed)
+    # check_path(args.output_dir)
+    #
+    # os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_id
+    # args.cuda_condition = torch.cuda.is_available() and not args.no_cuda
 
     args.data_file = os.path.join(args.data_dir, args.data_name + '.csv')
 
-    user_seq, max_item = get_user_seqs_long_csv(args.data_file)
+    user_seq, max_item, long_sequence = get_user_seqs_long_csv(args.data_file)
     # args.ckp = 20
     args_str = f'{args.model_name}-{args.data_name}-epochs-{args.ckp}'
     checkpoint = args_str + '.pt'
@@ -93,19 +92,19 @@ def main():
     if os.path.exists(args.checkpoint_path):
         trainer.load(args.checkpoint_path)
         print(f'Resume training from epoch={args.ckp} for pre-training!')
-        init_epoch = int(args.ckp)
+        init_epoch = int(args.ckp) - 1
     else:
         init_epoch = -1
     for epoch in range(args.pre_epochs):
         if epoch <= init_epoch:
           continue
-        pretrain_dataset = PretrainDataset(args, user_seq)
+        pretrain_dataset = PretrainDataset(args, user_seq, long_sequence)
         pretrain_sampler = RandomSampler(pretrain_dataset)
         pretrain_dataloader = DataLoader(pretrain_dataset, sampler=pretrain_sampler, batch_size=args.pre_batch_size)
 
         trainer.pretrain(epoch, pretrain_dataloader)
 
-        # if (epoch + 1) % 10 == 0:
+        # save checkpoint after execution of each epoch
         ckp = f'{args.model_name}-{args.data_name}-epochs-{epoch+1}.pt'
         checkpoint_path = os.path.join(args.output_dir, ckp)
         trainer.save(checkpoint_path)

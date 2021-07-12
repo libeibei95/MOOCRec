@@ -4,6 +4,7 @@ Script used for preparing dataset for pre-training and fine-tuning the model
 @author: Abinash Sinha
 """
 
+import random
 import torch
 from torch.utils.data import Dataset
 
@@ -12,9 +13,10 @@ from utils import neg_sample
 
 class PretrainDataset(Dataset):
 
-    def __init__(self, args, user_seq):
+    def __init__(self, args, user_seq, long_sequence):
         self.args = args
         self.user_seq = user_seq
+        self.long_sequence = long_sequence
         self.max_len = args.max_seq_length
         self.part_sequence = []
         self.split_sequence()
@@ -41,29 +43,63 @@ class PretrainDataset(Dataset):
         if seq_len == 2:
             t = 1
         else:
-            t = torch.randint(1, seq_len-1, (1,))
+            if not seq_len == 1:
+                t = torch.randint(1, seq_len-1, (1,))
+
         # input sub-sequence
-        inp_subseq = sequence[:t]
+        if seq_len == 1:
+            inp_subseq = sequence
+        else:
+            inp_subseq = sequence[:t]
         inp_pad_len = self.max_len - len(inp_subseq)
         inp_pos_items = ([0] * inp_pad_len) + inp_subseq
         inp_pos_items = inp_pos_items[-self.max_len:]
 
         # label sub-sequence
-        label_subseq = sequence[t:]
-        label_pad_len = self.max_len - len(label_subseq)
+        if seq_len == 1:
+            label_subseq = sequence
+        else:
+            label_subseq = sequence[t:]
+        len_label_subseq = len(label_subseq)
+        label_pad_len = self.max_len - len_label_subseq
         label_pos_items = [0] * label_pad_len + label_subseq
         label_pos_items = label_pos_items[-self.max_len:]
         label_pos_items.reverse()
+
+        # neg label sub-sequence
+        if seq_len == 1:
+            neg_label_subseq = sequence
+        else:
+            neg_start_id = random.randint(0, len(self.long_sequence) - len_label_subseq)
+            neg_label_subseq = self.long_sequence[neg_start_id:neg_start_id+len_label_subseq]
+        neg_label_pad_len = self.max_len - len_label_subseq
+        label_neg_items = [0] * neg_label_pad_len + neg_label_subseq
+        label_neg_items = label_neg_items[-self.max_len:]
+        label_neg_items.reverse()
+
         # next item
-        next_item = [sequence[t]]
+        if seq_len == 1:
+            next_item = [sequence[0]]
+        else:
+            next_item = [sequence[t]]
+
+        # neg next item
+        if seq_len == 1:
+            neg_next_item = [sequence[0]]
+        else:
+            item_set = set(sequence)
+            neg_next_item = [neg_sample(item_set, self.args.item_size)]
 
         assert len(inp_pos_items) == self.max_len
         assert len(label_pos_items) == self.max_len
+        assert len(label_neg_items) == self.max_len
 
         cur_tensors = (
             torch.tensor(inp_pos_items, dtype=torch.long),  # actual input sub-sequence of items
             torch.tensor(label_pos_items, dtype=torch.long),  # actual label sub-sequence of items
-            torch.tensor(next_item, dtype=torch.long)  # item next to input sub-sequence of items
+            torch.tensor(label_neg_items, dtype=torch.long), # label sub-sequence of negatively samples items
+            torch.tensor(next_item, dtype=torch.long),  # item next to input sub-sequence of items
+            torch.tensor(neg_next_item, dtype=torch.long) # negative item next to input sub-sequence of items
         )
 
         return cur_tensors

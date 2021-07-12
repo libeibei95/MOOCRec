@@ -167,17 +167,19 @@ def get_user_seqs_long_csv(data_file):
     """
     data_df = pd.read_csv(data_file)
     user_seq = []
+    long_sequence = []
     item_set = set()
     user_set = set()
     for idx, row in data_df.iterrows():
         items = row['video_ids'].split(',')
         items = [int(item) for item in items]
+        long_sequence.extend(items)
         user_seq.append(items)
         item_set = item_set | set(items)
         user_set.add(row['id'])
     max_item = len(item_set)
     assert len(user_set) == len(user_seq)
-    return user_seq, max_item
+    return user_seq, max_item, long_sequence
 
 
 def get_user_seqs_and_sample(data_file, sample_file):
