@@ -21,7 +21,7 @@ def get_num_uniq_items(item):
     return num_uniq_items
 
 
-def calculate_and_plot_stats(item, fig_id):
+def calculate_and_plot_stats(args, item, fig_id):
     series_num_items = mooccube_df['num_{}_ids'.format(item)]
     sum_num_items = series_num_items.sum()
     avg_num_items = series_num_items.mean()
@@ -82,7 +82,7 @@ if __name__ == '__main__':
     print('\n')
 
     fig_idx = 0
-    fig_idx = calculate_and_plot_stats('course', fig_idx)
-    calculate_and_plot_stats('video', fig_idx)
+    fig_idx = calculate_and_plot_stats(args, 'course', fig_idx)
+    calculate_and_plot_stats(args, 'video', fig_idx)
 
 
