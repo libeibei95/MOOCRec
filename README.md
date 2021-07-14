@@ -56,6 +56,28 @@ user_2 | neg_item_1,neg_item_2,...,neg_item_99
 ```shell script
 python ./data/data_explorer.py
 ```
+Total number of students: 48640
+
+
+Number of courses watched: 3370213  
+Average number of courses watched: 69.29  
+Median number of courses watched: 35.0  
+1st quartile number of courses watched: 16.0  
+3rd quartile of courses watched: 81.0  
+Maximum number of courses watched: 3377  
+Minimum number of courses watched: 1  
+Number of unique courses watched: 685  
+
+
+Number of videos watched: 4663919  
+Average number of videos watched: 95.89  
+Median number of videos watched: 56.0  
+1st quartile number of videos watched: 26.0  
+3rd quartile of videos watched: 117.0  
+Maximum number of videos watched: 3337  
+Minimum number of videos watched: 2  
+Number of unique videos watched: 34101  
+
 
 ## Pre-training (Disentangled Self-supervision)
 ```shell script
