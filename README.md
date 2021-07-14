@@ -74,6 +74,13 @@ python finetuner.py --mode sample --data_name MOOCCube --ckp pretrain_epochs_num
 ```shell script
 python finetuner.py --mode full --data_name MOOCCube --ckp pretrain_epochs_num
 ```
+
+## Explanation
+```shell script
+python explainer.py
+
+```
+
 ### References
 1. Jianxin Ma, Chang Zhou, Hongxia Yang, Peng Cui, Xin Wang, and Wenwu Zhu. 2020. 
 **Disentangled Self-Supervision in Sequential Recommenders.** 
