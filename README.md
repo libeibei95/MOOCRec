@@ -17,6 +17,7 @@ based on latent self-supervision and disentanglement. These two challenges basic
 ```shell script
 pip install -r requirements.txt
 ```
+explores the pre-processed data
 
 ## Data Preprocessing
 ```shell script
@@ -53,13 +54,12 @@ user_2 | neg_item_1,neg_item_2,...,neg_item_99
 
 ## Data Exploration
 ```shell script
-python data_explorer.py
+python ./data/data_explorer.py
 ```
-explores the pre-processed data
 
 ## Pre-training (Disentangled Self-supervision)
 ```shell script
-python run_pretrain.py --data_name MOOCCube
+python pretrainer.py --data_name MOOCCube
 ```
 
 ## Training (Fine tuning)
@@ -67,14 +67,27 @@ We support two evaluation methods.
 
 + Rank ground-truth item with 99 randomly sampled negative items
 ```shell script
-python run_train.py --neg_sampling sample --data_name MOOCCube --ckp pretrain_epochs_num
+python finetuner.py --mode sample --data_name MOOCCube --ckp pretrain_epochs_num
 ```
 
 + Rank ground-truth item with all items
 ```shell script
-python run_train.py --neg_sampling full --data_name MOOCCube --ckp pretrain_epochs_num
+python finetuner.py --mode full --data_name MOOCCube --ckp pretrain_epochs_num
 ```
-### 
+### References
+1. Jianxin Ma, Chang Zhou, Hongxia Yang, Peng Cui, Xin Wang, and Wenwu Zhu. 2020. 
+**Disentangled Self-Supervision in Sequential Recommenders.** 
+In Proceedings of the 26th ACM SIGKDD International Conference on Knowledge Discovery & Data Mining (KDD '20). 
+Association for Computing Machinery, New York, NY, USA, 483–491.
+2. Wang-Cheng Kang and Julian McAuley. 2018. **Self-attentive sequential recommendation.** In ICDM 2018.
+3. L. Kong, C. de Massond’Autume, L. Yu, W. Ling, Z. Dai, and D.Yogatama.2020. 
+**A Mutual Information Maximization Perspective of Language Representation Learning.** In ICLR 2020.
+4. A. van den Oord, Y. Li, and O. Vinyals. 2018. 
+**Representation Learning with Contrastive Predictive Coding.** CoRR abs/1807.03748 (2018). arXiv:1807.03748
+5. Kun Zhou, Hui Wang, Wayne Xin Zhao, Yutao Zhu, Sirui Wang, Fuzheng Zhang, Zhongyuan Wang, and Ji-Rong Wen. 2020. 
+**S3-Rec: Self-Supervised Learning for Sequential Recommendation with Mutual Information Maximization.** 
+Proceedings of the 29th ACM International Conference on Information & Knowledge Management. 
+Association for Computing Machinery, New York, NY, USA, 1893–1902. DOI:https://doi.org/10.1145/3340531.3411954
 
 ### Cite
 If you find codes useful for your research or development, please cite:
