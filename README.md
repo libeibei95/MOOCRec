@@ -21,7 +21,7 @@ explores the pre-processed data
 
 ## Data Preprocessing
 ```shell script
-python ./data/data_preprocessor.py
+python data_preprocessor.py
 ```
 data preprocessor to 
 1. label encode video ids
@@ -54,7 +54,7 @@ user_2 | neg_item_1,neg_item_2,...,neg_item_99
 
 ## Data Exploration
 ```shell script
-python ./data/data_explorer.py
+python data_explorer.py
 ```
 Total number of students: 48640
 
